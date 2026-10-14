@@ -29,6 +29,48 @@ const loginUser = async ({ email, password }) => {
     return existingUser;
 };
 
+const deleteUser = async ({ id, requester }) => {
+    if (requester.role !== "super_admin") {
+        const error = new Error("Only Super Admin can delete users");
+        error.statusCode = 403;
+        throw error;
+    }
+
+    const existingUser = await User.findById(id);
+
+    if (!existingUser) {
+        const error = new Error("User not found");
+        error.statusCode = 404;
+        throw error;
+    }
+
+    if (existingUser.role === "super_admin") {
+        const error = new Error("Super Admin cannot be deleted");
+        error.statusCode = 403;
+        throw error;
+    }
+
+    await User.findByIdAndDelete(id);
+
+    return {
+        message: "User successfully deleted",
+    };
+};
+
+
+const getUserById = async (id) => {
+    const user = await User.findById(id)
+        .select("name email role createdAt");
+
+    if (!user) {
+        const error = new Error("User not found");
+        error.statusCode = 404;
+        throw error;
+    }
+
+    return user;
+};
+
 
 const getAllUsers = async () => {
     const users = await User.find()
@@ -38,4 +80,4 @@ const getAllUsers = async () => {
     return users;
 };
 
-module.exports = { signupUser, loginUser, deleteUser, getAllUsers };
+module.exports = { signupUser, loginUser, deleteUser, getUserById, getAllUsers };

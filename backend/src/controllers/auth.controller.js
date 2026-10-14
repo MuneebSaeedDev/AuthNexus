@@ -1,5 +1,5 @@
 
-const { signupUser, loginUser, deleteUser, getAllUsers } = require("../services/user.service");
+const { signupUser, loginUser, getAllUsers } = require("../services/user.service");
 const User = require('../models/user.model');
 const jwt = require('jsonwebtoken');
 
@@ -173,5 +173,4 @@ module.exports = {
     login,
     logout,
     fetchAllUsers,
-    deleteUserController
 };

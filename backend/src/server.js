@@ -6,6 +6,7 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const authRoutes = require('./routes/auth.routes');
+const userRoutes = require("./routes/user.routes");
 const connectDB = require('./config/db');
 
 const app = express();
@@ -21,12 +22,8 @@ app.use(cors({
     credentials: true
 }));
 
-// Routes
-app.get('/healthz', (req, res) => {
-    res.status(200).json({ status: 'ok', message: 'API is running' });
-});
-
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/users', userRoutes)
 
 const PORT = process.env.PORT || 5000;
 
