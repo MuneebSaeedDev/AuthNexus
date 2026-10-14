@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect, useContext } from 'react';
+import { createContext, useState, useContext, useCallback } from 'react';
 import api from '../services/api';
 
 const AuthContext = createContext();
@@ -7,21 +7,7 @@ export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const response = await api.get('/auth/me');
-        setUser({ ...response.data.user, session: response.data.session });
-      } catch (error) {
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchUser();
-  }, []);
+  const [loading] = useState(false);
 
   const login = async (email, password) => {
     const response = await api.post('/auth/login', { email, password });
@@ -39,8 +25,34 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  const AllUsersFetch = useCallback(async () => {
+    const response = await api.get('/auth/users');
+    return response.data;
+  }, []);
+
+  const deleteUserById = useCallback(async (id) => {
+    const response = await api.delete(`/users/${id}`);
+    return response.data;
+  }, []);
+
+  const fetchUserById = useCallback(async (id) => {
+    const response = await api.get(`/users/${id}`);
+    return response.data;
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout, loading }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        signup,
+        logout,
+        loading,
+        AllUsersFetch,
+        deleteUserById,
+        fetchUserById,
+      }}
+    >
       {!loading && children}
     </AuthContext.Provider>
   );
