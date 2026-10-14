@@ -1,23 +1,4 @@
-# Dependencies — backend and frontend
 node_modules/
-
-# Environment variables — anywhere in the project
 .env
 .env.*
 !.env.example
-
-# Build output
-dist/
-build/
-
-# Logs
-*.log
-npm-debug.log*
-
-# OS files
-.DS_Store
-Thumbs.db
-
-# Editor files
-.vscode/
-.idea/
