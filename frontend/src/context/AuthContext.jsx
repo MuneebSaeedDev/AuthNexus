@@ -1,4 +1,4 @@
-import { createContext, useState, useContext, useCallback } from 'react';
+import { createContext, useState, useContext, useCallback, useEffect } from 'react';
 import api from '../services/api';
 
 const AuthContext = createContext();
@@ -6,12 +6,32 @@ const AuthContext = createContext();
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  // State ko localStorage se initialize karein taake reload par session zaya na ho
+  const [user, setUser] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem('user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch (error) {
+      console.error('Failed to parse user from localStorage', error);
+      return null;
+    }
+  });
+
   const [loading] = useState(false);
+
+  // Jab bhi user state change ho, localStorage ko update karein
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem('user', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('user');
+    }
+  }, [user]);
 
   const login = async (email, password) => {
     const response = await api.post('/auth/login', { email, password });
-    setUser({ ...response.data.user, session: response.data.session });
+    const userData = { ...response.data.user, session: response.data.session };
+    setUser(userData);
     return response.data;
   };
 
@@ -21,8 +41,13 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    await api.post('/auth/logout');
+    try {
+      await api.post('/auth/logout');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
     setUser(null);
+    localStorage.removeItem('user');
   };
 
   const AllUsersFetch = useCallback(async () => {
