@@ -1,37 +1,43 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import SplitLayout from '../components/SplitLayout';
 import InputField from '../components/InputField';
 import Alert from '../components/Alert';
-import { useAuth } from '../context/AuthContext';
+import { signupUser, clearAuthErrors } from '../features/auth/authSlice';
 
 export default function SignupPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const { signup } = useAuth();
+  const [validationError, setValidationError] = useState('');
   const navigate = useNavigate();
+
+  const dispatch = useDispatch();
+
+  const { signupStatus, signupError } = useSelector(
+    (state) => state.auth
+  );
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setValidationError('');
+    dispatch(clearAuthErrors());
 
     if (password !== confirmPassword) {
-      return setError('Passwords do not match');
+      setValidationError('Passwords do not match');
+      return;
     }
 
-    setLoading(true);
-
     try {
-      await signup(name, email, password);
+      await dispatch(
+        signupUser({ name, email, password })
+      ).unwrap();
+
       navigate('/login');
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to create an account.');
-    } finally {
-      setLoading(false);
+    } catch {
+      // Backend error signupError mein available hoga via Redux auth state.
     }
   };
 
@@ -91,7 +97,7 @@ export default function SignupPage() {
         </p>
       </div>
 
-      <Alert message={error} type="error" />
+      <Alert message={validationError || signupError} type="error" />
 
       <form onSubmit={handleSubmit} className="space-y-3.5">
         <InputField
@@ -148,10 +154,10 @@ export default function SignupPage() {
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={signupStatus === 'loading'}
           className="w-full bg-primary hover:bg-primary-hover text-white py-2.5 px-4 rounded-xl font-medium text-sm transition-all duration-150 shadow-sm hover:shadow active:scale-[0.99] disabled:opacity-60 disabled:pointer-events-none cursor-pointer flex items-center justify-center gap-2 mt-2"
         >
-          {loading ? (
+          {signupStatus === 'loading' ? (
             <>
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
               <span>Creating account...</span>

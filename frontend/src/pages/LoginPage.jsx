@@ -3,28 +3,53 @@ import { Link, useNavigate } from 'react-router-dom';
 import SplitLayout from '../components/SplitLayout';
 import InputField from '../components/InputField';
 import Alert from '../components/Alert';
-import { useAuth } from '../context/AuthContext';
+// import { useAuth } from '../context/AuthContext';
+
+import { useDispatch, useSelector } from "react-redux";
+import { loginUser } from "../features/auth/authSlice";
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  // const [error, setError] = useState('');
+  // const [loading, setLoading] = useState(false);
+  // const { login } = useAuth();
+
+  const dispatch = useDispatch();
+
+  const { loginStatus, loginError } = useSelector(
+    (state) => state.auth
+  );
+
   const navigate = useNavigate();
+
+  // const handleSubmit = async (e) => {
+  //   e.preventDefault();
+  //   setError('');
+  //   setLoading(true);
+
+  //   try {
+  //     await login(email, password);
+  //     navigate('/dashboard');
+  //   } catch (err) {
+  //     setError(err.response?.data?.message || 'Failed to login. Please check your credentials.');
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setLoading(true);
 
     try {
-      await login(email, password);
-      navigate('/dashboard');
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to login. Please check your credentials.');
-    } finally {
-      setLoading(false);
+      await dispatch(
+        loginUser({ email, password })
+      ).unwrap();
+
+      navigate("/dashboard");
+    } catch {
+      // Error authSlice mein save ho chuka hai.
     }
   };
 
@@ -85,7 +110,9 @@ export default function LoginPage() {
         </p>
       </div>
 
-      <Alert message={error} type="error" />
+      {/* <Alert message={error} type="error" /> */}
+
+      <Alert message={loginError} type="error" /> 
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <InputField
@@ -115,7 +142,7 @@ export default function LoginPage() {
           }
         />
 
-        <button
+        {/* <button
           type="submit"
           disabled={loading}
           className="w-full bg-primary hover:bg-primary-hover text-white py-2.5 px-4 rounded-xl font-medium text-sm transition-all duration-150 shadow-sm hover:shadow active:scale-[0.99] disabled:opacity-60 disabled:pointer-events-none cursor-pointer flex items-center justify-center gap-2 mt-2"
@@ -128,6 +155,15 @@ export default function LoginPage() {
           ) : (
             <span>Sign In</span>
           )}
+        </button> */}
+        <button
+          type="submit"
+          disabled={loginStatus === "loading"}
+          className="w-full bg-primary hover:bg-primary-hover text-white py-2.5 px-4 rounded-xl font-medium text-sm disabled:opacity-60"
+        >
+          {loginStatus === "loading"
+            ? "Signing in..."
+            : "Sign In"}
         </button>
       </form>
 
