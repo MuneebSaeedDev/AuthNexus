@@ -6,10 +6,11 @@ import api from "../../services/api";
 
 function getSaveduser() {
     try {
-        const savedUser = localStorage.getItem('user');
+        const savedUser = localStorage.getItem("user");
         return savedUser ? JSON.parse(savedUser) : null;
-    } catch (error) {
-        return error;
+    } catch {
+        localStorage.removeItem("user");
+        return null;
     }
 }
 
@@ -31,6 +32,29 @@ export const loginUser = createAsyncThunk(
         }
     }
 )
+
+
+export const googleAuthLogin = createAsyncThunk(
+    "auth/googleAuthLogin",
+    async (credential, { rejectWithValue }) => {
+        try {
+            const response = await api.post("/auth/google", {
+                credential,
+            });
+
+            return {
+                ...response.data.user,
+                session: response.data.session,
+            };
+        } catch (error) {
+            return rejectWithValue(
+                error.response?.data?.message ||
+                "Google authentication failed."
+            );
+        }
+    }
+);
+
 
 // 2. SIGNUP
 export const signupUser = createAsyncThunk(
@@ -145,9 +169,36 @@ const authSlice = createSlice({
                 state.user = null;
                 state.logoutStatus = "failed";
             });
+
+        
+
+        // GOOGLE LOGIN
+        builder
+            .addCase(googleAuthLogin.pending, (state) => {
+                state.loginStatus = "loading";
+                state.loginError = null;
+            })
+            .addCase(googleAuthLogin.fulfilled, (state, action) => {
+                state.loginStatus = "succeeded";
+                state.loginError = null;
+                state.user = action.payload;
+
+                localStorage.setItem(
+                    "user",
+                    JSON.stringify(action.payload)
+                );
+            })
+            .addCase(googleAuthLogin.rejected, (state, action) => {
+                state.loginStatus = "failed";
+                state.loginError =
+                    action.payload || action.error.message;
+            });
+
     }
 })
 
 export const { clearAuthErrors } = authSlice.actions;
+
+
 
 export default authSlice.reducer;

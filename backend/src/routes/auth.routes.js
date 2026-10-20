@@ -1,5 +1,5 @@
 const express = require('express');
-const { signup, login, logout, fetchAllUsers } = require('../controllers/auth.controller');
+const { signup, login, logout, fetchAllUsers, googleLogin } = require('../controllers/auth.controller');
 const { protect, superAdminOnly } = require('../middlewares/auth.middleware');
 
 const router = express.Router();
@@ -8,5 +8,6 @@ router.post('/signup', signup);
 router.post('/login', login);
 router.post('/logout', logout);
 router.get('/users', protect, superAdminOnly, fetchAllUsers);
+router.post("/google", googleLogin);
 
 module.exports = router;

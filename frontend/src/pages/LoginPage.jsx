@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import SplitLayout from '../components/SplitLayout';
 import InputField from '../components/InputField';
@@ -6,7 +6,7 @@ import Alert from '../components/Alert';
 // import { useAuth } from '../context/AuthContext';
 
 import { useDispatch, useSelector } from "react-redux";
-import { loginUser } from "../features/auth/authSlice";
+import { loginUser, googleAuthLogin } from "../features/auth/authSlice";
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -52,6 +52,55 @@ export default function LoginPage() {
       // Error authSlice mein save ho chuka hai.
     }
   };
+
+  // client_id = 309315163262-brf43326smt8jdj44alaac505uhl4l52.apps.googleusercontent.com
+
+  const handleCredentialLogin = async (credentialResponse) => {
+    try {
+      const result = await dispatch(
+        googleAuthLogin(credentialResponse.credential)
+      ).unwrap();
+
+      console.log("Google login successful:", result);
+
+      navigate("/dashboard", { replace: true });
+    } catch (error) {
+      console.error("Google login failed:", error);
+    }
+  };
+
+
+  useEffect(() => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+    if (!clientId) {
+      console.error("Google Client ID is missing");
+      return;
+    }
+
+    if (!window.google?.accounts?.id) {
+      console.error("Google script is not loaded");
+      return;
+    }
+
+    const button = document.getElementById("googleSignInButton");
+
+    if (!button) {
+      console.error("Google button container not found");
+      return;
+    }
+
+    window.google.accounts.id.initialize({
+      client_id: clientId,
+      callback: handleCredentialLogin,
+    });
+
+    window.google.accounts.id.renderButton(button, {
+      theme: "outline",
+      size: "large",
+      text: "continue_with",
+    });
+  }, []);
 
   const RightContent = (
     <>
@@ -132,6 +181,7 @@ export default function LoginPage() {
           label="Password"
           id="password"
           type="password"
+          autoComplete="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="••••••••"
@@ -141,6 +191,7 @@ export default function LoginPage() {
             </svg>
           }
         />
+        <div id="googleSignInButton"></div>
 
         {/* <button
           type="submit"

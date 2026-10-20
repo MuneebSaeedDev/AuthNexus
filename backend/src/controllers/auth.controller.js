@@ -1,4 +1,5 @@
 
+const { OAuth2Client } = require("google-auth-library");
 const { signupUser, loginUser, getAllUsers } = require("../services/user.service");
 const User = require('../models/user.model');
 const jwt = require('jsonwebtoken');
@@ -125,6 +126,99 @@ const login = async (req, res) => {
 };
 
 
+const googleClient = new OAuth2Client(
+    process.env.GOOGLE_CLIENT_ID
+);
+
+const googleLogin = async (req, res) => {
+    try {
+        const { credential } = req.body;
+
+        if (!credential) {
+            return res.status(400).json({
+                success: false,
+                message: "Google credential is required",
+            });
+        }
+
+        const ticket = await googleClient.verifyIdToken({
+            idToken: credential,
+            audience: process.env.GOOGLE_CLIENT_ID,
+        });
+
+        const payload = ticket.getPayload();
+
+        if (
+            !payload ||
+            !payload.sub ||
+            !payload.email ||
+            !payload.email_verified
+        ) {
+            return res.status(401).json({
+                success: false,
+                message: "Google account verification failed",
+            });
+        }
+
+        const googleId = payload.sub;
+        const email = payload.email.toLowerCase();
+        const name = payload.name || "Google User";
+
+        let user = await User.findOne({
+            $or: [
+                { googleId },
+                { email },
+            ],
+        });
+
+        if (!user) {
+            const existingUsersCount = await User.countDocuments();
+
+            user = await User.create({
+                name,
+                email,
+                googleId,
+                role: existingUsersCount === 0
+                    ? "super_admin"
+                    : "user",
+                authProvider: "google",
+            });
+        } else {
+            if (
+                user.googleId &&
+                user.googleId !== googleId
+            ) {
+                return res.status(409).json({
+                    success: false,
+                    message: "This email is linked to another Google account",
+                });
+            }
+
+            if (!user.googleId) {
+                user.googleId = googleId;
+                await user.save();
+            }
+        }
+
+        return sendTokenResponse(user, 200, res);
+
+    } catch (error) {
+        console.error("Google login error:", error);
+
+        if (error.code === 11000) {
+            return res.status(409).json({
+                success: false,
+                message: "Account already exists. Please try again.",
+            });
+        }
+
+        return res.status(401).json({
+            success: false,
+            message: "Google authentication failed",
+        });
+    }
+};
+
 
 const logout = async (req, res, next) => {
     try {
@@ -173,4 +267,5 @@ module.exports = {
     login,
     logout,
     fetchAllUsers,
+    googleLogin
 };
