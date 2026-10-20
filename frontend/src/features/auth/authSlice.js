@@ -1,7 +1,4 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-// createSlice() aapki state aur us state ko update karne ke rules define karta hai.
-// createAsyncThunk() asynchronous operations, jaise backend API se login karna ya users ki list fetch karna, manage karne mein help karta hai.
-
 import api from "../../services/api";
 
 function getSaveduser() {
@@ -20,7 +17,6 @@ export const loginUser = createAsyncThunk(
     async ({ email, password }, { rejectWithValue }) => {
         try {
             const response = await api.post("/auth/login", { email, password });
-
             return {
                 ...response.data.user,
                 session: response.data.session,
@@ -31,9 +27,9 @@ export const loginUser = createAsyncThunk(
             );
         }
     }
-)
+);
 
-
+// GOOGLE LOGIN
 export const googleAuthLogin = createAsyncThunk(
     "auth/googleAuthLogin",
     async (credential, { rejectWithValue }) => {
@@ -55,7 +51,6 @@ export const googleAuthLogin = createAsyncThunk(
     }
 );
 
-
 // 2. SIGNUP
 export const signupUser = createAsyncThunk(
     "auth/signupUser",
@@ -73,42 +68,32 @@ export const signupUser = createAsyncThunk(
 
 // 3. LOGOUT
 export const logoutUser = createAsyncThunk(
-    'auth/logoutUser',
+    "auth/logoutUser",
     async (_, { rejectWithValue }) => {
         try {
-            await api.post('auth/logout');
-            return true
+            await api.post("/auth/logout");
+            return true;
         } catch (error) {
-            rejectWithValue(
-                error.respose?.data?.message || "Logout request failed."
-            )
+            return rejectWithValue(
+                error.response?.data?.message || "Logout request failed."
+            );
         }
     }
-)
+);
 
 const initialState = {
     user: getSaveduser(),
 
     loginStatus: "idle",
     loginError: null,
-
+    signupStatus: "idle",
+    signupError: null,
     logoutStatus: "idle",
-}
+};
 
 const authSlice = createSlice({
-
-    // createSlice() ek Redux state section banata hai.Ismein aap define karte ho:
-    // - State ka naam kya hai.
-    // - Starting state kya hogi.
-    // - State ko manually update karne ke rules kya hain.
-    // - API requests ke results aane par state kaise update hogi.
-
     name: "auth",
     initialState,
-
-    // reducers
-    // Aapke slice ke andar define kiye gaye normal actions handle karta hai.
-    // Example: clearAuthErrors()
 
     reducers: {
         clearAuthErrors(state) {
@@ -117,13 +102,8 @@ const authSlice = createSlice({
         },
     },
 
-    // extraReducers
-    // Slice ke bahar define hue actions, jaise createAsyncThunk() ke pending, fulfilled aur rejected      actions, handle karta hai.
-    // Example: loginUser.pending
-
     extraReducers: (builder) => {
         // LOGIN
-        // builder.addCase(action, reducerFunction);
         builder
             .addCase(loginUser.pending, (state) => {
                 state.loginStatus = "loading";
@@ -131,7 +111,9 @@ const authSlice = createSlice({
             })
             .addCase(loginUser.fulfilled, (state, action) => {
                 state.loginStatus = "succeeded";
+                state.loginError = null;
                 state.user = action.payload;
+                localStorage.setItem("user", JSON.stringify(action.payload));
             })
             .addCase(loginUser.rejected, (state, action) => {
                 state.loginStatus = "failed";
@@ -147,12 +129,13 @@ const authSlice = createSlice({
             })
             .addCase(signupUser.fulfilled, (state) => {
                 state.signupStatus = "succeeded";
+                state.signupError = null;
             })
             .addCase(signupUser.rejected, (state, action) => {
                 state.signupStatus = "failed";
                 state.signupError =
                     action.payload || action.error.message;
-            })
+            });
 
         // LOGOUT
         builder
@@ -162,15 +145,13 @@ const authSlice = createSlice({
             .addCase(logoutUser.fulfilled, (state) => {
                 state.user = null;
                 state.logoutStatus = "succeeded";
+                localStorage.removeItem("user");
             })
             .addCase(logoutUser.rejected, (state) => {
-                // Local UI state clear kar dein,
-                // chahe server request fail ho jaye.
                 state.user = null;
                 state.logoutStatus = "failed";
+                localStorage.removeItem("user");
             });
-
-        
 
         // GOOGLE LOGIN
         builder
@@ -193,12 +174,9 @@ const authSlice = createSlice({
                 state.loginError =
                     action.payload || action.error.message;
             });
-
-    }
-})
+    },
+});
 
 export const { clearAuthErrors } = authSlice.actions;
-
-
 
 export default authSlice.reducer;

@@ -1,43 +1,26 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import SplitLayout from '../components/SplitLayout';
 import InputField from '../components/InputField';
 import Alert from '../components/Alert';
-// import { useAuth } from '../context/AuthContext';
 
 import { useDispatch, useSelector } from "react-redux";
-import { loginUser, googleAuthLogin } from "../features/auth/authSlice";
+import { loginUser, googleAuthLogin, clearAuthErrors } from "../features/auth/authSlice";
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  // const [error, setError] = useState('');
-  // const [loading, setLoading] = useState(false);
-  // const { login } = useAuth();
 
   const dispatch = useDispatch();
+  const navigate = useNavigate();
 
   const { loginStatus, loginError } = useSelector(
     (state) => state.auth
   );
 
-  const navigate = useNavigate();
-
-  // const handleSubmit = async (e) => {
-  //   e.preventDefault();
-  //   setError('');
-  //   setLoading(true);
-
-  //   try {
-  //     await login(email, password);
-  //     navigate('/dashboard');
-  //   } catch (err) {
-  //     setError(err.response?.data?.message || 'Failed to login. Please check your credentials.');
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
-
+  useEffect(() => {
+    dispatch(clearAuthErrors());
+  }, [dispatch]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -47,15 +30,13 @@ export default function LoginPage() {
         loginUser({ email, password })
       ).unwrap();
 
-      navigate("/dashboard");
+      navigate("/dashboard", { replace: true });
     } catch {
       // Error authSlice mein save ho chuka hai.
     }
   };
 
-  // client_id = 309315163262-brf43326smt8jdj44alaac505uhl4l52.apps.googleusercontent.com
-
-  const handleCredentialLogin = async (credentialResponse) => {
+  const handleCredentialLogin = useCallback(async (credentialResponse) => {
     try {
       const result = await dispatch(
         googleAuthLogin(credentialResponse.credential)
@@ -67,8 +48,7 @@ export default function LoginPage() {
     } catch (error) {
       console.error("Google login failed:", error);
     }
-  };
-
+  }, [dispatch, navigate]);
 
   useEffect(() => {
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -100,7 +80,7 @@ export default function LoginPage() {
       size: "large",
       text: "continue_with",
     });
-  }, []);
+  }, [handleCredentialLogin]);
 
   const RightContent = (
     <>
@@ -159,9 +139,7 @@ export default function LoginPage() {
         </p>
       </div>
 
-      {/* <Alert message={error} type="error" /> */}
-
-      <Alert message={loginError} type="error" /> 
+      <Alert message={loginError} type="error" />
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <InputField
@@ -191,22 +169,7 @@ export default function LoginPage() {
             </svg>
           }
         />
-        <div id="googleSignInButton"></div>
 
-        {/* <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-primary hover:bg-primary-hover text-white py-2.5 px-4 rounded-xl font-medium text-sm transition-all duration-150 shadow-sm hover:shadow active:scale-[0.99] disabled:opacity-60 disabled:pointer-events-none cursor-pointer flex items-center justify-center gap-2 mt-2"
-        >
-          {loading ? (
-            <>
-              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-              <span>Signing in...</span>
-            </>
-          ) : (
-            <span>Sign In</span>
-          )}
-        </button> */}
         <button
           type="submit"
           disabled={loginStatus === "loading"}
@@ -217,6 +180,10 @@ export default function LoginPage() {
             : "Sign In"}
         </button>
       </form>
+
+      <div className="mt-4 flex justify-center">
+        <div id="googleSignInButton"></div>
+      </div>
 
       <p className="mt-6 text-center text-sm text-slate-500">
         Don't have an account?{' '}

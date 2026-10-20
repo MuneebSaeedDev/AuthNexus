@@ -1,11 +1,13 @@
-
 const { OAuth2Client } = require("google-auth-library");
-const { signupUser, loginUser, getAllUsers } = require("../services/user.service");
-const User = require('../models/user.model');
-const jwt = require('jsonwebtoken');
+const { getAllUsers } = require("../services/user.service");
+const User = require("../models/user.model");
+const jwt = require("jsonwebtoken");
+
+// FIX: Initialize googleClient here!
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Generate JWT
-const generateToken = (id, role ) => {
+const generateToken = (id, role) => {
     return jwt.sign({ id, role }, process.env.JWT_SECRET, {
         expiresIn: process.env.JWT_EXPIRES_IN || '7d'
     });
@@ -22,23 +24,25 @@ const sendTokenResponse = (user, statusCode, res) => {
     const options = {
         expires: expiresAt,
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
     };
 
-    res.status(statusCode).cookie('token', token, options).json({
-        user: {
-            id: user._id,
-            name: user.name,
-            email: user.email,
-            role: user.role
-        },
-        session: {
-            issuedAt: decodedToken.iat * 1000,
-            expiresAt: decodedToken.exp * 1000,
-            duration: '7 Days'
-        }
-    });
+    res.status(statusCode)
+        .cookie("token", token, options)
+        .json({
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+            },
+            session: {
+                issuedAt: decodedToken.iat * 1000,
+                expiresAt: decodedToken.exp * 1000,
+                duration: "7 Days",
+            },
+        });
 };
 
 const signup = async (req, res) => {
@@ -48,56 +52,36 @@ const signup = async (req, res) => {
         if (!name || !email || !password) {
             return res.status(400).json({
                 success: false,
-                message: 'Please provide all required fields'
-            })
-        }
-
-        // Check if user exists
-        const userExists = await User.findOne({ email });
-        if (userExists) {
-            return res.status(409).json({
-                success: false,
-                message: 'Email already in use'
+                message: "Please provide name, email and password",
             });
         }
 
-        const user = await signupUser({
+        const normalizedEmail = email.toLowerCase().trim();
+        const existingUser = await User.findOne({ email: normalizedEmail });
+
+        if (existingUser) {
+            return res.status(409).json({
+                success: false,
+                message: "Email is already registered",
+            });
+        }
+
+        const existingUsersCount = await User.countDocuments();
+
+        const user = await User.create({
             name,
-            email,
-            password,
+            email: normalizedEmail,
+            passwordHash: password,
+            role: existingUsersCount === 0 ? "super_admin" : "user",
+            authProvider: "local",
         });
 
-        return res.status(201).json({
-            success: true,
-            message: 'Account created successfully',
-            user: {
-                id: user._id,
-                name: user.name,
-                email: user.email,
-                role: user.role,
-
-            }
-        });
+        return sendTokenResponse(user, 201, res);
     } catch (error) {
-        if (error.code === 11000) {
-            return res.status(409).json({
-                success: false,
-                message: "Email already exists",
-            });
-        }
-
-        if (error.name === "ValidationError") {
-            return res.status(400).json({
-                success: false,
-                message: error.message,
-            });
-        }
-
         console.error("Signup error:", error);
-
         return res.status(500).json({
             success: false,
-            message: "Internal server error",
+            message: error.message || "Failed to create account",
         });
     }
 };
@@ -109,26 +93,46 @@ const login = async (req, res) => {
         if (!email || !password) {
             return res.status(400).json({
                 success: false,
-                message: "Email and password are required",
+                message: "Please provide email and password",
             });
         }
 
-        const user = await loginUser({ email, password });
+        const normalizedEmail = email.toLowerCase().trim();
+
+        const user = await User.findOne({ email: normalizedEmail }).select("+passwordHash");
+
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid email or password",
+            });
+        }
+
+        if (user.authProvider === "google" && !user.passwordHash) {
+            return res.status(401).json({
+                success: false,
+                message: "This account uses Google Sign-In. Please continue with Google.",
+            });
+        }
+
+        const isMatch = await user.matchPassword(password);
+
+        if (!isMatch) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid email or password",
+            });
+        }
 
         return sendTokenResponse(user, 200, res);
-
     } catch (error) {
-        return res.status(error.statusCode || 500).json({
+        console.error("Login error:", error);
+        return res.status(500).json({
             success: false,
-            message: error.message || "Internal server error",
+            message: "Login failed",
         });
     }
 };
-
-
-const googleClient = new OAuth2Client(
-    process.env.GOOGLE_CLIENT_ID
-);
 
 const googleLogin = async (req, res) => {
     try {
@@ -161,14 +165,11 @@ const googleLogin = async (req, res) => {
         }
 
         const googleId = payload.sub;
-        const email = payload.email.toLowerCase();
+        const email = payload.email.toLowerCase().trim();
         const name = payload.name || "Google User";
 
         let user = await User.findOne({
-            $or: [
-                { googleId },
-                { email },
-            ],
+            $or: [{ googleId }, { email }],
         });
 
         if (!user) {
@@ -178,16 +179,11 @@ const googleLogin = async (req, res) => {
                 name,
                 email,
                 googleId,
-                role: existingUsersCount === 0
-                    ? "super_admin"
-                    : "user",
+                role: existingUsersCount === 0 ? "super_admin" : "user",
                 authProvider: "google",
             });
         } else {
-            if (
-                user.googleId &&
-                user.googleId !== googleId
-            ) {
+            if (user.googleId && user.googleId !== googleId) {
                 return res.status(409).json({
                     success: false,
                     message: "This email is linked to another Google account",
@@ -196,12 +192,11 @@ const googleLogin = async (req, res) => {
 
             if (!user.googleId) {
                 user.googleId = googleId;
-                await user.save();
+                await user.save({ validateModifiedOnly: true });
             }
         }
 
         return sendTokenResponse(user, 200, res);
-
     } catch (error) {
         console.error("Google login error:", error);
 
@@ -222,14 +217,14 @@ const googleLogin = async (req, res) => {
 
 const logout = async (req, res, next) => {
     try {
-        res.cookie('token', 'none', {
-            expires: new Date(Date.now() + 10 * 1000), // expires in 10 seconds
+        res.cookie("token", "none", {
+            expires: new Date(Date.now() + 10 * 1000),
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict'
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "strict",
         });
 
-        res.status(200).json({ message: 'Logged out successfully' });
+        res.status(200).json({ message: "Logged out successfully" });
     } catch (error) {
         next(error);
     }
@@ -251,7 +246,6 @@ const fetchAllUsers = async (req, res) => {
             count: users.length,
             data: users,
         });
-
     } catch (error) {
         console.error("Fetch users error:", error);
 
@@ -267,5 +261,5 @@ module.exports = {
     login,
     logout,
     fetchAllUsers,
-    googleLogin
+    googleLogin,
 };

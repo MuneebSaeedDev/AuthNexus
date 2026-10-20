@@ -8,6 +8,7 @@ export const fetchAllUsers = createAsyncThunk(
     async (_, { rejectWithValue }) => {
         try {
             const response = await api.get("/auth/users");
+            console.log("user Slice fetchAlluserData response:", response)
             const body = response.data;
 
             // Tumhare existing Dashboard mein res.data use ho raha hai.
@@ -36,6 +37,7 @@ export const deleteUserById = createAsyncThunk(
     async (id, { rejectWithValue }) => {
         try {
             await api.delete(`/users/${id}`);
+            console.log("user Slice logout response:", `/user${id}`)
 
             // Successful deletion ke baad reducer ko ID milegi.
             return id;
